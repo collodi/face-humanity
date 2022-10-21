@@ -66,58 +66,42 @@ def logged_in(user_ind):
 def login():
 	camera = cv2.VideoCapture(0)
 
-	ret, frame = camera.read()
-	zeros = np.zeros(frame.shape)
+	frame = capture_camera(camera)
+	zeros = np.zeros((600, 360))
+	if frame is not None:
+		zeros = np.zeros(frame.shape)
+
 	imgbytes = cv2.imencode('.png', zeros)[1].tobytes()
 
 	layout = [
 			[sg.Image(data=imgbytes, key='image')],
-			[sg.Text('', key='greeting')],
-			[sg.Button('Log In', disabled=True, key='login')],
 			[sg.Button('Go Back')]
 	]
 
 	window = sg.Window('Log In', layout, modal=True)
 
-	user_ind = None
-	det_timeout = 0
 	action_timeout = 0
-
 	while True:
 		event, values = window.read(timeout=5)
 		if event == sg.WINDOW_CLOSED or event == 'Go Back':
 			break
-		elif event == 'login' and user_ind is not None:
-			window.close()
-			logged_in(user_ind)
-			return
 
-		ret, frame = camera.read()
+		frame = capture_camera(camera)
 		boxes, probs = mtcnn.detect(frame)
 
 		img = frame
 		if boxes is not None and probs[0] > 0.5:
-			l, t, r, b = boxes[0].astype(int)
-			img = cv2.rectangle(frame.copy(), (l, t), (r, b), (0, 0, 255), 1)
 			face = mtcnn.extract(frame[..., ::-1], boxes, None)
 			embedding = resnet(face.unsqueeze(0))[0].detach()
 
+			l, t, r, b = boxes[0].astype(int)
+			img = cv2.rectangle(frame, (l, t), (r, b), (0, 0, 255), 1)
+
 			dist, ind = db.find_closest_embedding(embedding)
 			if dist < 0.65:
-				_, _, name = db.get_user(ind)
-				window['greeting'].update(f"Hello, {name}")
-				window['login'].update(disabled=False)
-
-				user_ind = ind
-				det_timeout = 0
-
-		if det_timeout < 10:
-			det_timeout += 1
-		else:
-			window['greeting'].update('')
-			window['login'].update(disabled=True)
-
-			user_ind = None
+				window.close()
+				logged_in(ind)
+				return
 
 		imgbytes = cv2.imencode('.png', img)[1].tobytes()
 		window['image'].update(data=imgbytes)
@@ -154,6 +138,8 @@ def register():
 	if face is None:
 		show_msg('Could not find a face! Please try again.')
 		return
+	elif face is False:
+		return
 
 	layout = [
 			[sg.Image(data=tensor_to_pngbytes(face), key='image')],
@@ -186,8 +172,11 @@ def capture_face():
 	camera = cv2.VideoCapture(0)
 	face = None
 
-	ret, frame = camera.read()
-	zeros = np.zeros(frame.shape)
+	frame = capture_camera(camera)
+	zeros = np.zeros((600, 360))
+	if frame is not None:
+		zeros = np.zeros(frame.shape)
+
 	imgbytes = cv2.imencode('.png', zeros)[1].tobytes()
 
 	layout = [
@@ -198,19 +187,19 @@ def capture_face():
 	window = sg.Window('Capture Face', layout, modal=True)
 
 	while True:
-		event, values = window.read(timeout=5)
+		event, values = window.read(timeout=20)
 		if event == sg.WINDOW_CLOSED or event == 'Go Back':
 			window.close()
-			return None
+			return False
 
-		ret, frame = camera.read()
+		frame = capture_camera(camera)
 		boxes, probs = mtcnn.detect(frame)
 
 		img = frame
 		if boxes is not None and probs[0] > 0.5:
 			l, t, r, b = boxes[0].astype(int)
-			img = cv2.rectangle(frame.copy(), (l, t), (r, b), (0, 0, 255), 1)
 			face = mtcnn.extract(frame[..., ::-1], boxes, None)
+			img = cv2.rectangle(frame, (l, t), (r, b), (0, 0, 255), 1)
 
 		imgbytes = cv2.imencode('.png', img)[1].tobytes()
 		window['image'].update(data=imgbytes)
@@ -220,6 +209,17 @@ def capture_face():
 
 	window.close()
 	return face
+
+def capture_camera(camera):
+	ret, frame = camera.read()
+	if frame is None:
+		return None
+
+	h, w, d =  frame.shape
+	x_s = max(0, w // 2 - 180)
+	x_e = w // 2 + 180
+
+	return frame[:, x_s:x_e, :]
 
 if __name__ == '__main__':
 	main()

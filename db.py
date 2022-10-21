@@ -8,7 +8,7 @@ db = { 'faces': np.empty((0, 512), np.float64), 'info': np.empty((0, 3)) }
 def load():
 	global db
 	if not os.path.exists(DB_FN):
-		store_db()
+		store()
 
 	db = dict(np.load(DB_FN))
 
