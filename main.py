@@ -99,6 +99,7 @@ def login():
 
 			dist, ind = db.find_closest_embedding(embedding)
 			if dist < 0.65:
+				camera.release()
 				window.close()
 				logged_in(ind)
 				return
@@ -111,6 +112,7 @@ def login():
 		if action_timeout == 300:
 			break
 
+	camera.release()
 	window.close()
 
 def show_msg(msg):
@@ -186,9 +188,11 @@ def capture_face():
 
 	window = sg.Window('Capture Face', layout, modal=True)
 
+	# TODO only detect & update face once in so many loops
 	while True:
 		event, values = window.read(timeout=20)
 		if event == sg.WINDOW_CLOSED or event == 'Go Back':
+			camera.release()
 			window.close()
 			return False
 
@@ -207,6 +211,7 @@ def capture_face():
 		if event == 'Capture Face':
 			break
 
+	camera.release()
 	window.close()
 	return face
 
